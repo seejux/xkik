@@ -1,0 +1,75 @@
+plugins {
+    id 'com.android.dynamic-feature'
+    id 'kotlin-android'
+    id "com.jaqxues.pack-compiler"
+}
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.2"
+
+    defaultConfig {
+        applicationId "com.seeju.packimpl"
+        minSdkVersion 19
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation project(":app")
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.core:core-ktx:1.3.1'
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    androidTestImplementation 'androidx.annotation:annotation:1.1.0'
+}
+packCompiler {
+    attributes = [
+            Development      : false,
+            PackVersion      : "1.0.0",
+            PackVersionCode  : 1,
+            MinApkVersionCode: 1,
+            PackImplClass    : "com.seeju.xkik.packimpl.PackImpl",
+            IgVersion        : "151.0.0.23.120",
+    ]
+    getJarName = { attributes ->
+        return "Pack_${attributes["PackVersion"]}_${attributes["IgVersion"]}".toString()
+    }
+    adbPush = {
+        defaultPath = "/storage/emulated/0/"
+        directory = "XKik/Packs"
+        deviceConfigFile = file("../Secrets/AdbPushConfig.json")
+    }
+}
+android.buildTypes.forEach { buildType ->
+    def buildTypeCap = buildType.name.capitalize()
+    task("applyPackChanges$buildTypeCap") {
+        dependsOn "adbPushPack$buildTypeCap"
+        group "install"
+
+        doLast {
+            def igPkg = 'com.instagram.android'
+            exec {
+                commandLine android.adbExecutable, 'shell', 'am', 'force-stop', igPkg
+            }
+            exec {
+                commandLine android.adbExecutable, 'shell', 'am', 'start', '-n', 'com.marz.instaprefs/.MainActivity', '--es', 'select_new_pack', tasks.getByName("adbPushPack$buildTypeCap").outputs.files.singleFile.name
+            }
+            sleep(200)
+            exec {
+                commandLine android.adbExecutable, 'shell', 'am', 'start', '-n', "$igPkg/.activity.MainTabActivity"
+            }
+        }
+    }
+}

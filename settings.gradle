@@ -1,0 +1,3 @@
+rootProject.name = "xkik"
+include ':app'
+include ':packimpl'
